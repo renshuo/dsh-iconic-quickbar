@@ -17,8 +17,11 @@
  *    (i.e. the sidebar is expanded; the collapsed rail keeps its stacked icons,
  *    where a row of them would not fit);
  *  - labels are hidden but aria-label still names each button;
- *  - panels outside the requested set leave the row and remain reachable from
- *    the More menu the row keeps beside them.
+ *  - every registered panel keeps its button — the row wraps, so the set can
+ *    grow without any launcher dropping out.
+ *
+ * No panel is named anywhere in this file: the row is built from whatever the
+ * host registered, so a new or renamed launcher needs no change here.
  *
  * Host markup this targets, and why each shape is matched: through 0.2.1 the
  * panel list held its `<button>` rows directly; 0.2.2 added a per-row list-item
@@ -65,14 +68,6 @@ window.__ModuleLoader__.load({
       'Panneaux globaux', 'Globale Bereiche', 'Глобальные панели', 'Painéis globais',
     ]
 
-    /** Panels that keep a button in the row; everything else moves to More. */
-    const KEPT_LABELS = [
-      '插件', 'Plugins',
-      '任务看板', 'Task Board',
-      '待办', 'Todos',
-      '资料馆', 'Library',
-    ]
-
     const STYLE_ID = 'dsh-iconic-quickbar-style'
 
     /** Build the scoped stylesheet from the label tables above. */
@@ -116,12 +111,6 @@ window.__ModuleLoader__.load({
         navOf(`${wide} > button:not([data-iqb-toggle])${sel}`),
         navOf(`${wide} > span > button[aria-haspopup]${sel}`),
       ])
-
-      // Panels the row keeps; the rest are hidden in icon mode and stay
-      // reachable from More. Matched on the wrapper (0.2.2+) and on the bare
-      // button, since hiding only the inner button would leave an empty square.
-      const keepByHas = KEPT_LABELS.map(l => `:not(:has(> button[aria-label="${l}"]))`).join('')
-      const keepByLabel = KEPT_LABELS.map(l => `:not([aria-label="${l}"])`).join('')
 
       return `
 /* ---- the mode switch ---- */
@@ -219,15 +208,9 @@ ${rowButton(' > span + span')} {
   display: none;
 }
 
-/* ---- panels outside the requested set move into the More menu ---- */
-${join(PANEL_NAV_LABELS.map(l =>
-        `${gate} nav[aria-label="${l}"]${wide} > div${keepByHas}`))} {
-  display: none !important;
-}
-${join(PANEL_NAV_LABELS.map(l =>
-        `${gate} nav[aria-label="${l}"]${wide} > button:not([aria-haspopup]):not([data-iqb-toggle])${keepByLabel}`))} {
-  display: none !important;
-}
+/* Every registered panel keeps its button. The row wraps, so a plugin that
+   adds a fifth or sixth launcher simply flows onto a second line; nothing here
+   names a panel, so no launcher can go missing when the set changes. */
 
 /* Icon mode: the switch collapses into one more 32px square at the row's end. */
 ${navOf(`${wide} > button.iqb-toggle`)} {

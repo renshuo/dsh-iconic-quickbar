@@ -207,6 +207,10 @@ function stylesheetSuite() {
   check('选择器按每种语言逐一展开（不是裸 nav）',
     rowRule.sels.length === 8 && rowRule.sels.every(s => s.startsWith('html:not')))
   check('没有裸的后代选择器（会误伤菜单行文字）', !/[a-z\]=] button[ ,{]/.test(css))
+  check('样式表里没有任何面板名（不留白名单）',
+    !PANELS.some(([label]) => css.includes(`aria-label="${label}"`)))
+  check('只留一条 display:none !important（unpin），没有收纳规则',
+    (css.match(/display:\s*none\s*!important/g) ?? []).length === 1)
   check('没有 !important 之外的重量级覆盖', (css.match(/!important/g) ?? []).length <= 4)
   env.effects.forEach(dispose => { if (typeof dispose === 'function') dispose() })
 }
@@ -277,11 +281,17 @@ async function suite(kind, shape, wide) {
     check('unpin 规则只钉在列表项里的第二个按钮上',
       unpinRules.every(r => r.sels.every(s => /div > button:last-of-type:not\(:first-of-type\)/.test(s))))
 
-    group('图标模式：收纳需求外的面板')
+    group('图标模式：每个面板都留在行内')
+    // The row is built from whatever the host registered. The old version kept
+    // a hardcoded allow-list and pushed the rest into More, so a panel missing
+    // from that list silently vanished from the row — 自动化任务 did.
     const rest = unique(restRules.flatMap(r => matchAll(document, r)))
-    const schedules = document.getElementById(shape === 'wrapped' ? 'w-schedules' : 'schedules')
-    check('自动化任务被移出行外', rest.includes(schedules))
-    check('四个目标面板保留在行内', boxes().every(el => !rest.includes(el)))
+    check('没有任何面板被移出行外', rest.length === 0)
+    check('自动化任务（不在旧白名单里）也在行内',
+      !rest.includes(document.getElementById(shape === 'wrapped' ? 'w-schedules' : 'schedules')))
+    check('五个面板全部保留在行内', boxes().length === 4
+      && boxes().every(el => !rest.includes(el))
+      && !rest.includes(document.getElementById(shape === 'wrapped' ? 'w-schedules' : 'schedules')))
     check('「更多」不被收走', !rest.includes(document.getElementById('moreTrigger')))
     check('开关自身不被收走', !rest.includes(toggle))
     check('回归：菜单项按钮不被收走', !rest.includes(document.getElementById('menuItem')))

@@ -220,8 +220,11 @@ async function main() {
       if (mode === 'icon') {
         check(`图标模式下 nav ${wide ? '横排' : '保持窄轨竖排'}`, m.nav.direction === (wide ? 'row' : 'column'))
         if (wide) check('图标模式 nav 收成单行', m.nav.box.h < 48)
+        // Built from whatever the host registered: nothing may drop out.
         const kept = m.rows.filter(r => !r.hidden)
-        check('图标模式只保留四个面板 + 更多', wide ? kept.length === 4 : kept.length === 5)
+        check('图标模式每个注册的面板都在行内', kept.length === m.rows.length)
+        check('图标模式含「自动化任务」（曾因白名单被漏掉）',
+          kept.some(r => r.label === '自动化任务'))
         check('图标模式行内没有可见文字', wide ? kept.every(r => !r.textShown) && !m.toggle.textShown : !m.toggle.textShown)
         check('图标模式每格是 32px 方块', wide ? kept.every(r => r.box.w === 32 && r.box.h === 32) : true)
         check('图标模式开关在行尾（32px 方块）', wide ? m.toggle.box.w === 32 && m.toggle.box.x > m.more.x : true)

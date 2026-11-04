@@ -1,4 +1,4 @@
 {
   "meta.title": "Sidebar icon bar",
-  "meta.description": "Turns the panel list under New Session into one row of text-less icon buttons (Plugins / Task Board / Todos / Library + More), with a switch at the row end to flip between the icon row and the original list."
+  "meta.description": "Turns the panel list under New Session into one row of text-less icon buttons (whichever panels the host registers), with a switch at the row end to flip between the icon row and the original list."
 }

@@ -3,6 +3,26 @@
 本项目的所有重要变更记录在此。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.1] - 2026-11-05
+
+### 修复
+
+- **图标行漏掉「自动化任务」。** 根因：`client.js` 里有一份写死的面板白名单
+  `KEPT_LABELS`（插件 / 任务看板 / 待办 / 资料馆），不在名单里的面板会被
+  `display: none` 移出行外。这份名单既多余又危险——图标行本来就会换行，
+  完全放得下所有面板；而白名单一旦漏项，那个面板就从图标行里凭空消失了。
+
+  现在**整份名单连同收纳规则一起删掉**：行里有什么，完全由宿主注册了哪些面板决定。
+  装个带侧栏入口的插件就自己多一格，面板改名、增减都不需要改本插件。
+- 测试里同类的写死也一并清掉：jsdom 套件与像素校验原本都在断言
+  「只保留四个面板 + 更多」，等于把 bug 写进了验收标准。现在断言的是
+  「没有任何注册面板被移出行外」，并专门盯住「自动化任务」这一格。
+
+### 新增
+
+- 两条变异断言：样式表里出现任何面板名即失败；`display: none !important`
+  只允许 unpin 那一条（收纳规则一旦回归立刻报错）。
+
 ## [1.1.0] - 2026-11-05
 
 适配 DSH 0.2.2 的侧栏改版。
@@ -57,5 +77,6 @@
 - 逗号连接的选择器列表追加后代组合符只会绑定到最后一个选择器，
   改为按语言逐条展开。
 
+[1.1.1]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.1.1
 [1.1.0]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.0.0
