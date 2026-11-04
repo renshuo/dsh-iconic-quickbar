@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-iconic-quickbar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "把 DeepSeek Harness 左侧栏「新建会话」下方的面板列表改为一行无文字图标按钮（插件/任务看板/待办/资料馆 + 更多），行尾带开关可在原版列表与图标行之间切换。",
   "type": "module",
@@ -18,7 +18,8 @@
     "icon.svg"
   ],
   "scripts": {
-    "test": "node test/dom.test.mjs"
+    "test": "node test/dom.test.mjs",
+    "test:visual": "node test/visual.mjs"
   },
   "keywords": [
     "dsh-plugin",

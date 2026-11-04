@@ -10,3 +10,6 @@ coverage/
 .idea/
 .vscode/
 *.swp
+
+# 视觉校验的产物（测试从零生成）
+.debug/

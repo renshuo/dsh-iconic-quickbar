@@ -1,10 +1,12 @@
 # dsh-iconic-quickbar — bundle patch
 #
-# Adds a horizontal, text-less icon bar (插件 / 任务看板 / 待办 / 资料馆) at the
-# sidebar foot and hides the four native vertical panel rows so only the bar
-# remains. The native rows are hidden by their stable aria-label, not by
-# disabling their plugins — the plugins and their central panels stay fully
-# functional and are opened by the bar's buttons via ctx.layout.selectPanel.
+# Declares the bundle row so the Client half (client.js) is loaded. All work
+# happens there: the sidebar's own panel list is restyled into one horizontal,
+# text-less icon row, with a mode switch at its right edge.
+#
+# Nothing is hidden by disabling a plugin: the native rows keep their plugins,
+# their centre panels and their aria-labels, and panels the row does not carry
+# stay reachable from the list's own More menu.
 - insert:
     - id: dsh-iconic-quickbar
       name: '@local/dsh-iconic-quickbar'

@@ -19,6 +19,13 @@
  *  - labels are hidden but aria-label still names each button;
  *  - panels outside the requested set leave the row and remain reachable from
  *    the More menu the row keeps beside them.
+ *
+ * Host markup this targets, and why each shape is matched: through 0.2.1 the
+ * panel list held its `<button>` rows directly; 0.2.2 added a per-row list-item
+ * `<div>` wrapper (the row now carries a hover-revealed unpin button beside it)
+ * and moved to 32px rows. Every rule therefore covers both the wrapper and the
+ * bare button, and the "expanded sidebar" test keys on the caption span rather
+ * than on either structure.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-iconic-quickbar',
@@ -77,42 +84,65 @@ window.__ModuleLoader__.load({
       // Icon-mode rules only; dropping the attribute restores the stock list.
       const gate = 'html:not([data-iqb-mode="native"])'
       const navOf = sel => join(PANEL_NAV_LABELS.map(l => `${gate} nav[aria-label="${l}"]${sel}`))
+      // Mode-independent nav rules (the rail layout), so the switch also sits
+      // correctly while the list is showing its stock rows.
+      const navOfAny = sel => join(PANEL_NAV_LABELS.map(l => `nav[aria-label="${l}"]${sel}`))
 
-      // A rendered text label is what distinguishes the wide sidebar from the
-      // collapsed rail, so these rules leave the rail alone.
-      const wide = ':has(> button > span + span)'
-      // The More button lives inside the Menu's anchor <span> (Menu.tsx wraps
-      // its anchor that way), so it is one level deeper than a panel row. The
-      // wrapper also holds the open menu list, so the inner part is pinned to
-      // the trigger button: `button[aria-haspopup]` and its own children only —
-      // never a bare descendant selector, which would reach the menu rows.
-      const rowButton = sel => [
-        navOf(`${wide} > button${sel}`),
+      // A rendered caption span is what tells the wide sidebar from the 36px
+      // collapsed rail, so these rules leave the rail alone. Both row shapes
+      // count: the button directly under the nav (<= 0.2.1) or inside its
+      // list-item wrapper (>= 0.2.2). The switch's own caption is excluded —
+      // otherwise the switch alone would make the rail look expanded and turn
+      // its 36px column into a wrapping row of icons.
+      const wide = ':has(> button:not([data-iqb-toggle]) > span + span, > div > button > span + span)'
+      const narrow = `:not(${wide})`
+
+      // The box squared off per control: 0.2.2's list-item wrapper, the bare
+      // row button on earlier builds, or the More trigger inside the Menu's
+      // anchor span.
+      const rowBox = join([
+        navOf(`${wide} > div:has(> button)`),
+        navOf(`${wide} > button:not([data-iqb-toggle])`),
+        navOf(`${wide} > span > button[aria-haspopup]`),
+      ])
+
+      // A row control, plus the More trigger one level deeper inside the
+      // Menu's anchor <span>. That span also holds the open menu list, so the
+      // descendant part is pinned to the trigger itself —
+      // `button[aria-haspopup]` and its own children only, never a bare
+      // descendant selector, which would reach the menu rows' captions.
+      const rowButton = sel => join([
+        navOf(`${wide} > div > button${sel}`),
+        navOf(`${wide} > button:not([data-iqb-toggle])${sel}`),
         navOf(`${wide} > span > button[aria-haspopup]${sel}`),
-      ].join(',\n')
+      ])
 
-      const notKept = KEPT_LABELS.map(l => `:not([aria-label="${l}"])`).join('')
-      // Our own switch is a direct child too, and must survive this rule.
-      const rest = join(PANEL_NAV_LABELS.map(l =>
-        `${gate} nav[aria-label="${l}"] > button:not([aria-haspopup]):not([data-iqb-toggle])${notKept}`))
+      // Panels the row keeps; the rest are hidden in icon mode and stay
+      // reachable from More. Matched on the wrapper (0.2.2+) and on the bare
+      // button, since hiding only the inner button would leave an empty square.
+      const keepByHas = KEPT_LABELS.map(l => `:not(:has(> button[aria-label="${l}"]))`).join('')
+      const keepByLabel = KEPT_LABELS.map(l => `:not([aria-label="${l}"])`).join('')
 
       return `
 /* ---- the mode switch ---- */
-/* Native mode: render exactly like a stock panel row (glyph + caption) so it
-   reads as a peer of the rows above it. */
+/* Stock row geometry: a 3px wrapper inset plus a 3px button inset plus the
+   row padding is where the host's captions start, so the switch lines up with
+   the rows above it in either mode. */
 .iqb-toggle {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: var(--dsh-sidebar-label-gap, 6px);
   width: auto;
-  min-height: 36px;
-  margin: 0 2px;
-  padding: 7px 8px;
+  min-height: 32px;
+  margin: 0;
+  padding: 5px 9px;
   box-sizing: border-box;
   border: none;
+  border-inline: var(--dsh-sidebar-paint-inset, 3px) solid transparent;
   border-radius: var(--dsw-radius-md, 8px);
   background: transparent;
+  background-clip: padding-box;
   color: var(--dsw-alias-label-primary, currentColor);
   font: inherit;
   line-height: 22px;
@@ -144,16 +174,71 @@ ${navOf(wide)} {
   gap: 3px;
 }
 
-/* Icon mode: the switch collapses to one more square icon at the row's end. */
+/* ---- compact square hit areas, icon only ---- */
+${rowBox} {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border: none;
+  border-radius: var(--dsw-radius-md, 8px);
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+/* The row control fills 0.2.2's wrapper; on earlier builds the rule above
+   squares the button itself. */
+${navOf(`${wide} > div > button`)} {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+/* 0.2.2 keeps a hover-revealed unpin button in that same wrapper. A 32px
+   square has no room for it — it would sit over the glyph and turn the
+   panel's click into an unpin — so it is hidden here; unpinning stays in the
+   stock list, one switch click away. Only the wrapper's *second* button is
+   touched, so a panel row is never hit. */
+${navOf(`${wide} > div > button:last-of-type:not(:first-of-type)`)} {
+  display: none !important;
+}
+
+/* The caption is hidden; aria-label still names the button. This covers the
+   panel rows in both shapes and the More button inside the Menu's span. */
+${rowButton(' > span + span')} {
+  display: none;
+}
+
+/* ---- panels outside the requested set move into the More menu ---- */
+${join(PANEL_NAV_LABELS.map(l =>
+        `${gate} nav[aria-label="${l}"]${wide} > div${keepByHas}`))} {
+  display: none !important;
+}
+${join(PANEL_NAV_LABELS.map(l =>
+        `${gate} nav[aria-label="${l}"]${wide} > button:not([aria-haspopup]):not([data-iqb-toggle])${keepByLabel}`))} {
+  display: none !important;
+}
+
+/* Icon mode: the switch collapses into one more 32px square at the row's end. */
 ${navOf(`${wide} > button.iqb-toggle`)} {
   width: 32px;
   height: 32px;
   min-height: 0;
   margin: 0 0 0 auto;
   padding: 0;
+  border-inline-width: 0;
   justify-content: center;
   gap: 0;
-  flex: none;
 }
 ${navOf(`${wide} > button.iqb-toggle > .iqb-toggle-caption`)} {
   display: none;
@@ -165,39 +250,20 @@ ${navOf(`${wide} > button.iqb-toggle:hover > .iqb-toggle-glyph`)} {
   color: var(--dsw-alias-label-primary, currentColor);
 }
 
-/* ---- one horizontal row, directly under the New Session button ---- */
-${navOf(wide)} {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-}
-
-/* ---- compact square hit areas, icon only ---- */
-${rowButton('')} {
-  flex: none;
-  width: 32px;
-  height: 32px;
+/* The 36px rail is glyph-only in either mode: a caption there would overflow
+   the column and push the glyph off the rail's centreline. */
+${navOfAny(`${narrow} > button.iqb-toggle`)} {
+  width: 36px;
+  height: 36px;
   min-height: 0;
   margin: 0;
   padding: 0;
+  border-inline-width: 0;
   justify-content: center;
   gap: 0;
 }
-
-${rowButton(':hover')} {
-  background: var(--dsw-alias-interactive-bg-hover, color-mix(in srgb, currentColor 10%, transparent));
-}
-
-/* The text label is hidden; aria-label still names the button. This covers
-   both the panel rows and the More button inside the Menu's anchor span. */
-${rowButton(' > span + span')} {
+${navOfAny(`${narrow} > button.iqb-toggle > .iqb-toggle-caption`)} {
   display: none;
-}
-
-/* ---- panels outside the requested set move into the More menu ---- */
-${rest} {
-  display: none !important;
 }
 `
     }

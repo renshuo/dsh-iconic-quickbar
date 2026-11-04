@@ -78,10 +78,32 @@ git clone https://github.com/renshuo/dsh-iconic-quickbar.git \
 
 | 规则 | 选择器 | 作用 |
 |---|---|---|
-| 横排 | `nav[aria-label="全局面板"]:has(> button > span + span)` | 只在**展开态**生效 |
-| 收窄 | 同上 `> button` 与 `> span > button[aria-haspopup]` | 32×32 方形居中 |
-| 隐藏文字 | 同上 `> button > span + span` 等 | 只留图标，`aria-label` 仍提供名称 |
-| 收纳 | `nav > button:not([aria-haspopup]):not([data-iqb-toggle]):not([aria-label="插件"])…` | 需求外的面板移出行外 |
+| 横排 | `nav[aria-label="全局面板"]:has(> div > button > span + span, > button > span + span)` | 只在**展开态**生效 |
+| 收窄 | `> div:has(> button)`（新版）/ `> button`（旧版）/ `> span > button[aria-haspopup]` | 32×32 方形居中 |
+| 隐藏文字 | 行按钮 `> span + span` | 只留图标，`aria-label` 仍提供名称 |
+| 收纳 | `nav > div:not(:has(> button[aria-label="插件"]))…` 及对应的裸按钮形态 | 需求外的面板移出行外 |
+
+### 两代宿主 DOM 都要覆盖
+
+DSH **0.2.2** 给每行加了一层列表项 `<div>`（行内多了悬停才出现的「取消固定」按钮），
+行高也从 36px 收到 32px。旧版是按钮直接挂在 `<nav>` 下：
+
+```
+0.2.1 及更早           0.2.2 起
+nav                    nav
+└── button.panelRow    ├── div.panelEntry
+    ├── span(图标)      │   ├── button.panelRow
+    └── span(文字)      │   │   ├── span(图标)
+                        │   │   └── span(文字)
+                        │   └── button.panelUnpin   ← 悬停出现
+                        └── span(Menu 锚点) > button[aria-haspopup]
+```
+
+所以每条规则都同时覆盖**包裹层**和**裸按钮**两种形态，
+展开态判定也改成看「有没有文字 span」而不是看某一种结构。
+新增的那个 unpin 按钮必须一起隐掉：32px 方块里放不下它，
+它会盖在图标上、把面板的点击变成取消固定。
+
 
 ### 模式开关
 
@@ -103,6 +125,8 @@ React 重渲染时可能把它踢掉，观察者发现脱离就重新挂回去�
 - **`:has()` 而不是宿主类名**：侧栏收起时 `wide=false`、按钮不渲染文字标签，
   用「有没有第二个 span」判断展开态，比猜 `.collapsed` 稳。收起后的 56px 窄轨
   一行放不下这些图标，保持原样竖排。
+  注意判定要**排除开关自己**：开关两种形态都带文字 span，
+  否则窄轨会因为这个 span 被误判成展开态，一格图标被撑成一整行。
 - **「更多」按钮在 `<span>` 里，不是 `<div>`**：宿主 Menu 组件
   （`ui-primitives/src/Menu.tsx`）用 `<span>` 包住 anchor，所以它是
   `nav > span > button[aria-haspopup]`。先写成 `> div > button` 时「更多」的文字
@@ -127,7 +151,8 @@ dsh-iconic-quickbar/
 │   └── zh.json
 ├── icon.svg
 ├── test/
-│   └── dom.test.mjs    # jsdom 行为与回归测试
+│   ├── dom.test.mjs    # jsdom 行为与回归测试
+│   └── visual.mjs      # 用宿主真实 CSS 在 Chromium 里量像素
 ├── LICENSE
 └── README.md
 ```
@@ -135,32 +160,51 @@ dsh-iconic-quickbar/
 ## 开发与测试
 
 ```bash
-npm install     # 安装 jsdom（唯一开发依赖）
-npm test        # 运行 49 项断言
+npm install        # 安装 jsdom（唯一开发依赖）
+npm test           # 155 项断言：两代 DOM × 展开态/窄轨
+npm run test:visual  # 像素校验，截图写到 .debug/
 ```
 
-测试把 `client.js` 原样载入 jsdom，并用一份贴近宿主真实结构的 fixture 驱动：
-展开态列表、收起窄轨、无关 nav、五个面板、「更多」及其展开的菜单列表。
+`npm test` 把 `client.js` 原样载入 jsdom，并跑**两代宿主 fixture × 两种宽度**四组：
+
+| 维度 | 取值 |
+|---|---|
+| 面板行形态 | `wrapped`（0.2.2+ 列表项 `<div>` 包裹）/ `flat`（0.2.1 裸按钮） |
+| 侧栏宽度 | 展开态（有文字标签）/ 收起窄轨（36px，无标签） |
 
 覆盖：样式门控与逐语言展开、开关挂载与停靠、横排/收窄/隐藏文字/收纳、
-菜单项不被误伤、模式切换的四种反应（属性/标签/图标/localStorage）、
-原版模式豁免全部布局规则、宿主重渲染后的重新挂载、卸载清理。
+菜单项不被误伤、unpin 不被误删面板行、窄轨不被开关文字冒充成展开态、
+模式切换的四种反应（属性/标签/图标/localStorage）、原版模式豁免全部布局规则、
+宿主重渲染后的重新挂载、卸载清理。
 
-这三类历史 bug 各有回归断言，并已验证它们**确实会失败**：
-错误的 `> div > button` 选择器、裸后代选择器、去掉开关的收走豁免。
+历史 bug 各有回归断言，并已用变异测试确认它们**确实会失败**
+（去掉 unpin 隐藏规则、展开态判定退回只看直接子 button、收纳规则漏掉包裹层、
+去掉开关文字隐藏 —— 四种变异各自被抓住）。
+
+`npm run test:visual` 补上 jsdom 量不出的东西：它从**已安装的宿主**里抽出编译后的
+侧栏与主题 CSS，重建宿主真实渲染的面板列表 DOM，把 `client.js` 载进 Chromium，
+然后量尺寸并截图（28 项断言 + `.debug/*.png`）。
+宿主改版导致的行结构变化、行高变化、开关与原版行的对齐偏移，都在这里暴露——
+0.2.2 那层列表项 `<div>` 就是这么发现的。缺少 Playwright / Chromium 时它会
+打印原因并跳过，不影响 `npm test`。
 
 ## 兼容性
 
 - 面向 DSH 的 Web 客户端；`dsh.client.platform = "web"`。
-- 依赖宿主侧栏的 `aria-label` 文案与 `nav` 列表结构。若宿主改版改动了这两处，
-  需同步更新 `client.js` 顶部的 `PANEL_NAV_LABELS` 与 `KEPT_LABELS`。
+- 依赖宿主侧栏的 `aria-label` 文案与 `nav` 列表的 DOM 结构。
+  若宿主改版改动了这两处，先跑 `npm run test:visual` 看是哪条断言变红，
+  再更新 `client.js` 顶部的 `PANEL_NAV_LABELS` / `KEPT_LABELS` 与 `buildCss()`。
+- 已在 DSH 0.2.1-rc.3（裸按钮形态）与 0.2.2-rc.1（列表项 `<div>` 形态）上验证。
 - 使用 `:has()`（现代浏览器均已支持）。
 
 ## 已知限制
 
-- 尚未在真实浏览器中做像素级验收（开发环境无浏览器控制能力）：间距、图标观感、
-  窄屏换行位置仍建议实际看一眼。
-- 「自动化任务」面板不在本插件收编范围内，保留原生竖排，或从「更多」菜单打开。
+- 像素验收是在**离线复现页**里做的（宿主编译后的真实 CSS + 真实 DOM 结构），
+  不是直接截取自运行的 DSH 窗口，所以整页排版（侧栏与主区域的相对位置）
+  仍建议实际扫一眼。
+- 图标模式隐藏了行内的「取消固定」按钮（32px 方块放不下它）。
+  取消固定仍需切回原版模式操作，这个能力没有丢。
+- 「自动化任务」面板不在本插件收编范围内，图标模式下收进「更多」菜单。
 
 ## 许可证
 
