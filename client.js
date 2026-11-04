@@ -31,7 +31,7 @@
  * than on either structure.
  */
 window.__ModuleLoader__.load({
-  id: '@local/dsh-iconic-quickbar',
+  id: '@renshuo/dsh-iconic-quickbar',
   factory(require) {
     /** Locale namespace for the switch's accessible name. */
     const NS = 'sidebar-icon-bar'

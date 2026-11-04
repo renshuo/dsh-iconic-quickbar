@@ -9,4 +9,4 @@
 # stay reachable from the list's own More menu.
 - insert:
     - id: dsh-iconic-quickbar
-      name: '@local/dsh-iconic-quickbar'
+      name: '@renshuo/dsh-iconic-quickbar'

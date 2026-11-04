@@ -23,6 +23,13 @@
 - 两条变异断言：样式表里出现任何面板名即失败；`display: none !important`
   只允许 unpin 那一条（收纳规则一旦回归立刻报错）。
 
+### 发布
+
+- **首个 npm 版本（本版即 1.1.1）**：包名由 `@local/dsh-iconic-quickbar` 改为
+  `@renshuo/dsh-iconic-quickbar`，移除 `private: true`，新增
+  `publishConfig.access: public`，可正式 `npm publish`。`cordis.patch.yml`
+  与 `client.js` 内的 bundle id 同步改为新名字。语义化版本沿用代码真实迭代到的 `1.1.1`。
+
 ## [1.1.0] - 2026-11-05
 
 适配 DSH 0.2.2 的侧栏改版。

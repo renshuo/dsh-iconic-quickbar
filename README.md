@@ -42,17 +42,29 @@
 
 本插件是 DSH 的 Cordis bundle（客户端半部），通过 profile 的 bundle 机制加载。
 
+### 方式一：从 npm 安装（推荐）
+
+```bash
+npm install @renshuo/dsh-iconic-quickbar
+```
+
+然后在 DSH 插件面板「安装第三方插件 → npm 包」输入 `@renshuo/dsh-iconic-quickbar`，
+或 `plugin_manager` 工具的 `install_bundle`，目标填该包名，最后**刷新页面**。
+
+### 方式二：从源码目录
+
 ```bash
 git clone https://github.com/renshuo/dsh-iconic-quickbar.git \
   ~/dsh-plugins/dsh-iconic-quickbar
 ```
 
-然后在 DSH 中把它安装为 bundle（插件面板的「安装第三方插件 → 本地目录」，
-或 `plugin_manager` 工具的 `install_bundle`，目标填上面这个目录的绝对路径），
+在 DSH 中把它安装为 bundle（插件面板的「安装第三方插件 → 本地目录」，
+或 `plugin_manager` 的 `install_bundle`，目标填上面这个目录的绝对路径），
 最后**刷新页面**。
 
-> 包名带 `@local/` 前缀且 `private: true`，因此不能直接 `npm publish`。
-> 若要发布到 npm，请先改成不含 `@local/` 的名字，并同步 `cordis.patch.yml` 里的 `name`。
+> 包名带 scope `@renshuo/`，并在 `package.json` 里设置 `publishConfig.access: public`，
+> 可直接 `npm publish`。默认 registry 指到 npmmirror；
+> 如需发到官方 registry，用 `npm publish --registry=https://registry.npmjs.org`。
 
 ## 使用
 
