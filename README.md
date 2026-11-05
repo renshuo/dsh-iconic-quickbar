@@ -65,9 +65,10 @@ git clone https://github.com/renshuo/dsh-iconic-quickbar.git \
 或 `plugin_manager` 的 `install_bundle`，目标填上面这个目录的绝对路径），
 最后**刷新页面**。
 
-> 包名带 scope `@renshuo/`，并在 `package.json` 里设置 `publishConfig.access: public`，
-> 可直接 `npm publish`。默认 registry 指到 npmmirror；
-> 如需发到官方 registry，用 `npm publish --registry=https://registry.npmjs.org`。
+> 已发布到 npmjs：`@renshuo/dsh-iconic-quickbar`，当前 `latest` 为 `1.2.0`。
+> 发新版直接 `npm publish`（`package.json` 已设 `publishConfig.access: public`）；
+> 账号开了 2FA 后，发布会在浏览器里要一次安全密钥确认；CI 场景用带
+> Bypass 2FA 的 granular token 或 Trusted Publishing。
 
 ## 使用
 

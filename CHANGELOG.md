@@ -23,6 +23,12 @@
 
 ### 发布
 
+- **首次真正发布到 npm**：`@renshuo/dsh-iconic-quickbar@1.2.0`（`latest`，
+  tarball sha1 `8b5445c82331fd4fda6944573ffa70cdb31c5aa9`），2026-11-05 经
+  staged publishing 暂存、维护者 2FA 批准后上线。registry 上同时留下 npm 为
+  「新包暂存」自动创建的占位版本 `0.0.0-stage`。
+- **更正 1.1.1 条目的「npm 首发」**：那次实际没有发成功（发布时 registry 上查不到
+  该包），1.1.1 只是仓库内的版本号。本版才是包第一次出现在 npmjs 上。
 - 测试：jsdom 159 → 231 项断言，像素校验 30 → 38 项断言；新增断言均经变异测试
   确认（去掉 `syncTips` 调用会触发 18 + 3 条失败）。
   顺带把 README 里过时的「155 项 / 28 项」改成实测基线。
