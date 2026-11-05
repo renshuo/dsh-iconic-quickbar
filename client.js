@@ -20,6 +20,14 @@
  *  - every registered panel keeps its button — the row wraps, so the set can
  *    grow without any launcher dropping out.
  *
+ * Icon mode hides each row's caption, so it also restores the name that caption
+ * used to give the icon: a native `title` tooltip is put on every panel button
+ * (and More), its text read straight from the hidden caption span. The host's
+ * own Tooltip is deliberately `disabled={wide}` — on in the collapsed rail,
+ * off in the expanded sidebar — so icon mode is exactly the state where nothing
+ * else names the icon-only buttons; the rail keeps its themed tooltip and is
+ * left alone (a native title there would show two bubbles).
+ *
  * No panel is named anywhere in this file: the row is built from whatever the
  * host registered, so a new or renamed launcher needs no change here.
  *
@@ -69,6 +77,75 @@ window.__ModuleLoader__.load({
     ]
 
     const STYLE_ID = 'dsh-iconic-quickbar-style'
+
+    /** Marks a `title` we put on a host button, so only ours is removed. */
+    const TIP_ATTR = 'data-iqb-tip'
+    /** Holds a host-provided `title` that our tooltip temporarily replaced. */
+    const TIP_PREV_ATTR = 'data-iqb-tip-prev'
+
+    /**
+     * Row controls, scoped to the nav's own children so the More menu's list
+     * (nested one level deeper) is never reached. Mirrors the CSS `rowButton`
+     * shapes: 0.2.2's list-item wrapper, the bare row button on <= 0.2.1, and
+     * the More trigger inside the Menu component's <span>. The switch is left
+     * out — it already carries its own `title` describing the click action.
+     */
+    const ROW_BUTTON_SELS = [
+      ':scope > div > button',
+      ':scope > button:not([data-iqb-toggle])',
+      ':scope > span > button[aria-haspopup]',
+    ]
+
+    /**
+     * Put a native tooltip on one icon-only row button, its text taken from the
+     * caption that icon mode hides. Native `title` is what the switch already
+     * uses, and it needs no React context or host component: the host's own
+     * Tooltip is `disabled={wide}` precisely in this (expanded) state.
+     * A pre-existing `title` is remembered so removing ours restores it.
+     */
+    function setTip(button, text) {
+      if (!button.hasAttribute(TIP_ATTR)) {
+        const prior = button.getAttribute('title')
+        if (prior !== null) button.setAttribute(TIP_PREV_ATTR, prior)
+        button.setAttribute(TIP_ATTR, '')
+      }
+      button.setAttribute('title', text)
+    }
+
+    /** Undo one of our tooltips, restoring a host `title` if there was one. */
+    function dropTip(button) {
+      if (!button.hasAttribute(TIP_ATTR)) return
+      const prior = button.getAttribute(TIP_PREV_ATTR)
+      if (prior !== null) button.setAttribute('title', prior)
+      else button.removeAttribute('title')
+      button.removeAttribute(TIP_PREV_ATTR)
+      button.removeAttribute(TIP_ATTR)
+    }
+
+    /** Remove every tooltip we added (mode switch back to text, or unmount). */
+    function clearTips() {
+      if (typeof document === 'undefined') return
+      for (const button of document.querySelectorAll(`[${TIP_ATTR}]`)) dropTip(button)
+    }
+
+    /**
+     * Keep the icon row named. In icon mode each row button gets a `title` from
+     * its hidden caption; a button with no caption (the collapsed rail, or the
+     * hover-revealed unpin) loses any title we had left on it — the rail keeps
+     * the host's themed tooltip, so a native one there would double up. In
+     * native mode the captions are visible again, so all our titles come off.
+     * @param {Element|null} nav the panel list, or null if the host has none
+     * @param {boolean} iconMode whether icon mode is active
+     */
+    function syncTips(nav, iconMode) {
+      if (!iconMode || nav === null) { clearTips(); return }
+      for (const button of nav.querySelectorAll(ROW_BUTTON_SELS.join(', '))) {
+        const caption = button.querySelector(':scope > span + span')
+        const text = caption === null ? '' : (caption.textContent ?? '').trim()
+        if (text === '') dropTip(button)
+        else if (!button.hasAttribute(TIP_ATTR) || button.getAttribute('title') !== text) setTip(button, text)
+      }
+    }
 
     /** Build the scoped stylesheet from the label tables above. */
     function buildCss() {
@@ -318,6 +395,17 @@ ${navOfAny(`${narrow} > button.iqb-toggle > .iqb-toggle-caption`)} {
     }
 
     /**
+     * Read the gate from the DOM, not from the closure's `mode`. The attribute
+     * is what the stylesheet actually reacts to, so tooltip state stays in step
+     * with the rendered layout even if the attribute is set from outside the
+     * click handler (e.g. a host or a test toggling it directly).
+     */
+    function isIconMode() {
+      if (typeof document === 'undefined') return false
+      return document.documentElement.getAttribute(ATTR) !== MODE_NATIVE
+    }
+
+    /**
      * Append the mode switch to the panel-list nav and keep it there.
      *
      * The list is host-rendered, so the button is adopted into its DOM rather
@@ -387,6 +475,12 @@ ${navOfAny(`${narrow} > button.iqb-toggle > .iqb-toggle-caption`)} {
         }
         const nav = findNav()
         if (nav !== null && button.parentNode !== nav) nav.appendChild(button)
+        // The icon row hides captions, so name each icon with the caption's own
+        // text. Gate on the rendered attribute (what the CSS reacts to), not on
+        // the closure's `mode`, so an external gate change stays in sync. Runs
+        // on every wakeup (idempotent) so a re-render, a locale switch or a new
+        // host-registered panel re-names itself.
+        syncTips(nav, isIconMode())
       }
 
       let queued = false
@@ -398,14 +492,23 @@ ${navOfAny(`${narrow} > button.iqb-toggle > .iqb-toggle-caption`)} {
         else setTimeout(run, 16)
       }
 
-      const observer = new MutationObserver(schedule)
-      observer.observe(document.body, { childList: true, subtree: true })
+      const bodyObserver = new MutationObserver(schedule)
+      // characterData catches a caption's text changing in place (e.g. a locale
+      // switch) without replacing its node; childList catches adopted buttons
+      // and rows the host re-renders.
+      bodyObserver.observe(document.body, { childList: true, characterData: true, subtree: true })
+      // The mode gate lives on <html>, outside body: watch it so a gate change
+      // made from outside the click handler still re-syncs the tooltips.
+      const rootObserver = new MutationObserver(schedule)
+      rootObserver.observe(document.documentElement, { attributes: true, attributeFilter: [ATTR] })
       sync()
 
       return () => {
-        observer.disconnect()
+        bodyObserver.disconnect()
+        rootObserver.disconnect()
         button.removeEventListener('click', onClick)
         button.remove()
+        clearTips()
         document.documentElement.removeAttribute(ATTR)
       }
     }

@@ -165,6 +165,8 @@ const MEASURE = () => {
   const visibleText = b => [...b.querySelectorAll('span')]
     .some(s => s.textContent.trim() !== '' && getComputedStyle(s).display !== 'none'
       && s.getBoundingClientRect().width > 0)
+  // Each icon-only row carries our native title, read from its hidden caption.
+  const rowButtons = [...nav.querySelectorAll(':scope > div > button, :scope > span > button[aria-haspopup]')]
   return {
     nav: { direction: getComputedStyle(nav).flexDirection, box: box(nav) },
     rows: [...nav.querySelectorAll(':scope > div')].map(wrap => {
@@ -174,9 +176,14 @@ const MEASURE = () => {
         hidden: getComputedStyle(wrap).display === 'none',
         box: box(wrap),
         textShown: visibleText(b),
+        title: b.getAttribute('title'),
       }
     }),
     more: box(nav.querySelector(':scope > span > button[aria-haspopup]')),
+    moreTitle: nav.querySelector(':scope > span > button[aria-haspopup]').getAttribute('title'),
+    tipCount: rowButtons.filter(b => b.hasAttribute('data-iqb-tip')).length,
+    unpinTipped: [...nav.querySelectorAll(':scope > div > button:not(:first-child)')]
+      .some(b => b.hasAttribute('data-iqb-tip')),
     toggle: { box: box(toggle), textShown: visibleText(toggle) },
   }
 }
@@ -228,6 +235,14 @@ async function main() {
         check('图标模式行内没有可见文字', wide ? kept.every(r => !r.textShown) && !m.toggle.textShown : !m.toggle.textShown)
         check('图标模式每格是 32px 方块', wide ? kept.every(r => r.box.w === 32 && r.box.h === 32) : true)
         check('图标模式开关在行尾（32px 方块）', wide ? m.toggle.box.w === 32 && m.toggle.box.x > m.more.x : true)
+        // The icon row hides captions, so each icon must carry the caption text
+        // as a native tooltip. In the rail the host's own Tooltip stays on, so
+        // none of ours may be added there (no double bubble).
+        check('图标模式每个面板图标都有 caption 原文的 tooltip',
+          wide ? kept.every(r => r.title === r.label) : m.tipCount === 0)
+        check('图标模式「更多」也有 tooltip', wide ? m.moreTitle === '更多' : m.moreTitle === null)
+        check('图标模式 tooltip 只加在行按钮上（不含 unpin）',
+          wide ? m.tipCount === kept.length + 1 && !m.unpinTipped : m.tipCount === 0)
       } else if (wide) {
         // The switch sits at the end of the list, so it has to line up with
         // the rows above it: same left edge, same height, and a caption.
@@ -239,6 +254,9 @@ async function main() {
         check('原版模式开关左边缘与行一致', Math.abs(m.toggle.box.x - row.box.x) <= 1)
         check('原版模式开关高度与行一致', m.toggle.box.h === row.box.h)
         check('原版模式开关文字可见', m.toggle.textShown)
+        // Captions are visible again, so our icon tooltips must be gone.
+        check('原版模式面板按钮没有残留 tooltip', m.tipCount === 0 && m.rows.every(r => r.title === null))
+        check('原版模式「更多」没有残留 tooltip', m.moreTitle === null)
       }
 
       if (!wide) {

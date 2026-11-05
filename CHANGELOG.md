@@ -3,6 +3,30 @@
 本项目的所有重要变更记录在此。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0] - 2026-11-05
+
+### 新增
+
+- **图标模式下每个图标都有 tooltip。** 图标模式把行内文字隐藏了，而宿主
+  `SidebarRoot` 的 `<Tooltip disabled={wide}>` 在展开态本就是关的（收起窄轨才开），
+  于是纯图标既没文字也没气泡。现在每个面板按钮（含「更多」）会补一个原生
+  `title`，内容直接读取被隐藏的 caption span：不写死面板名、不猜 `aria-label`，
+  宿主改文案或切换语言都会自动跟随。
+
+  tooltip 按与样式表同一个 `data-iqb-mode` 门控对齐：
+  - 原版模式（文字可见）自动撤掉，避免多余气泡；
+  - 收起窄轨由宿主自己的主题化 tooltip 负责，插件不加，避免双重气泡；
+  - 按钮原本自带的 `title` 会先记住，撤除时原样还原。
+
+  `MutationObserver` 同时监听 `childList` / `characterData` 与 `<html>` 上的模式属性：
+  行重渲染、文案原地改写、新面板加入、模式门控被外部直接改写都会重新对齐。
+
+### 发布
+
+- 测试：jsdom 159 → 231 项断言，像素校验 30 → 38 项断言；新增断言均经变异测试
+  确认（去掉 `syncTips` 调用会触发 18 + 3 条失败）。
+  顺带把 README 里过时的「155 项 / 28 项」改成实测基线。
+
 ## [1.1.1] - 2026-11-05
 
 ### 修复
@@ -84,6 +108,7 @@
 - 逗号连接的选择器列表追加后代组合符只会绑定到最后一个选择器，
   改为按语言逐条展开。
 
+[1.2.0]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.2.0
 [1.1.1]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.1.1
 [1.1.0]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/renshuo/dsh-iconic-quickbar/releases/tag/v1.0.0

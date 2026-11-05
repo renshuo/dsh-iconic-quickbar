@@ -88,12 +88,12 @@ function rules(css) {
 // ---------------------------------------------------------------- fixtures
 
 /** Row button: `wide` adds the caption span the host renders only expanded. */
-const row = (label, id, wide = true) =>
-  `<button aria-label="${label}" id="${id}"><span></span>${wide ? `<span>${label}</span>` : ''}</button>`
+const row = (label, id, wide = true, title = '') =>
+  `<button aria-label="${label}" id="${id}"${title ? ` title="${title}"` : ''}><span></span>${wide ? `<span>${label}</span>` : ''}</button>`
 
 /** 0.2.2+ row: the button plus its unpin sibling inside the list-item wrapper. */
-const wrappedRow = (label, id, wide = true) => `<div class="panelEntry${wide ? ' panelEntryWide' : ''}" id="w-${id}">
-      ${row(label, id, wide)}
+const wrappedRow = (label, id, wide = true, title = '') => `<div class="panelEntry${wide ? ' panelEntryWide' : ''}" id="w-${id}">
+      ${row(label, id, wide, title)}
       ${wide ? `<button aria-label="从侧边栏取消固定${label}" id="unpin-${id}"><svg></svg></button>` : ''}
     </div>`
 
@@ -115,9 +115,14 @@ const PANELS = [
   ['资料馆', 'library'],
 ]
 
+/** A host-provided title on one row: replacing it must not lose it. */
+const HOST_TITLE = '资料馆（宿主提示）'
+
 /** @param {'wrapped'|'flat'} shape @param {boolean} wide */
 function fixture(shape, wide) {
-  const entry = shape === 'wrapped' ? wrappedRow : (label, id, w = true) => row(label, id, w)
+  const entry = shape === 'wrapped'
+    ? (label, id, w) => wrappedRow(label, id, w, id === 'library' ? HOST_TITLE : '')
+    : (label, id, w) => row(label, id, w, id === 'library' ? HOST_TITLE : '')
   const rows = PANELS.map(([label, id]) => entry(label, id, wide)).join('\n    ')
   return `<!doctype html><html><body>
   <nav aria-label="全局面板" id="nav">
@@ -241,6 +246,10 @@ async function suite(kind, shape, wide) {
   const toggle = document.querySelector('#nav > .iqb-toggle')
   const hit = (rules, el) => el != null && rules.some(r => matchAll(document, r).includes(el))
   const captions = () => unique(captionRules.flatMap(r => matchAll(document, r)))
+  /** Every button carrying one of our tooltips, keyed by its title text. */
+  const tipped = () => q(document, '[data-iqb-tip]')
+  const tipOf = id => document.getElementById(id)?.getAttribute('title') ?? null
+  const tipCount = () => tipped().length
 
   group('模式开关挂载')
   check('开关已注入到 nav', toggle !== null && toggle.parentElement.id === 'nav')
@@ -270,6 +279,24 @@ async function suite(kind, shape, wide) {
     check('「更多」文字被隐藏', captions().includes(document.querySelector('#moreTrigger span + span')))
     check('开关自己的文字由专属规则隐藏', captions().includes(toggle.querySelector('.iqb-toggle-caption')))
     check('回归：菜单项文字不被隐藏', !captions().includes(document.getElementById('menuLabel')))
+
+    group('图标模式：每个图标都有 tooltip')
+    check('五个面板图标都带原生 title', PANELS.every(([label, id]) => tipOf(id) === label))
+    check('「更多」图标带 title「更多」', tipOf('moreTrigger') === '更多')
+    check('title 文本取自被隐藏的 caption（不是 aria-label 猜的）',
+      tipOf('plugins') === document.querySelector('#plugins span + span').textContent.trim())
+    check('宿主原有的 title 被记住（可还原）',
+      document.getElementById('library').getAttribute('data-iqb-tip-prev') === HOST_TITLE)
+    check('全部图标都打了我们的标记', tipped().length === 6
+      && PANELS.every(([, id]) => tipped().includes(document.getElementById(id)))
+      && tipped().includes(document.getElementById('moreTrigger')))
+    check('回归：unpin 按钮没有 tooltip',
+      (shape === 'wrapped' ? PANELS.map(([, id]) => `unpin-${id}`) : [])
+        .every(id => !tipped().includes(document.getElementById(id))))
+    check('回归：菜单项按钮没有 tooltip',
+      !tipped().includes(document.getElementById('menuItem')))
+    check('回归：开关自身不带我们的 tooltip 标记',
+      !toggle.hasAttribute('data-iqb-tip') && toggle.getAttribute('title') === '切换到原版模式')
 
     group('图标模式：unpin 不压住图标')
     if (shape === 'wrapped') {
@@ -306,6 +333,15 @@ async function suite(kind, shape, wide) {
       !(autoRule !== undefined && matchAll(document, autoRule).includes(toggle)))
     check('开关的文字不会被误判成「展开态」', document.querySelector('#nav > .iqb-toggle') !== null
       && matchAll(document, rowRule).length === 0)
+
+    group('收起窄轨：不叠加原生 tooltip')
+    // The host's own Tooltip stays enabled in the rail; adding a native title
+    // there would show two bubbles, and the rail renders no caption to read.
+    check('窄轨没有任何图标被我们加 tooltip', tipCount() === 0)
+    check('窄轨不改动按钮原有的 title', tipOf('library') === HOST_TITLE)
+    check('窄轨其余面板 / 「更多」仍没有 title',
+      PANELS.filter(([, id]) => id !== 'library').every(([, id]) => tipOf(id) === null)
+      && tipOf('moreTrigger') === null)
   }
 
   group('默认状态')
@@ -329,22 +365,70 @@ async function suite(kind, shape, wide) {
     restRules.every(r => matchAll(document, r).length === 0))
   check('回归：原版模式下开关不被方形规则压成 32px', !hit(squareRules, toggle))
 
+  group('原版模式：移除图标 tooltip')
+  // Captions are visible again, so a native title would be redundant noise.
+  check('图标 tooltip 全部移除（标记清空）', tipCount() === 0)
+  check('面板按钮不再有我们加的 title', PANELS.every(([, id]) =>
+    !document.getElementById(id).hasAttribute('data-iqb-tip')))
+  check('宿主原有的 title 被原样还原', tipOf('library') === HOST_TITLE)
+  check('没有 title 的面板按钮保持没有 title',
+    PANELS.filter(([, id]) => id !== 'library').every(([, id]) => tipOf(id) === null))
+  check('「更多」不再有我们加的 title', !document.getElementById('moreTrigger').hasAttribute('title'))
+
   group('切回图标模式')
   toggle.dispatchEvent(new env.window.MouseEvent('click', { bubbles: true }))
   check('清除 data-iqb-mode', !document.documentElement.hasAttribute('data-iqb-mode'))
   check('横排规则按宽度重新生效', matchAll(document, rowRule).length === (wide ? 1 : 0))
   check('持久化更新回 icon', env.localStorage.getItem('dsh-iconic-quickbar:mode') === 'icon')
+  check('切回图标模式后 tooltip 重新出现', wide
+    ? (PANELS.every(([label, id]) => tipOf(id) === label) && tipOf('moreTrigger') === '更多')
+    : tipCount() === 0)
 
-  group('宿主重渲染后的重新挂载')
+  group('外部直接改 data-iqb-mode（不经过开关点击）')
+  // The stylesheet reacts to the attribute, so tooltip state must too — the
+  // pixel harness switches modes this way, and a host could as well.
+  document.documentElement.setAttribute('data-iqb-mode', 'native')
+  await new Promise(resolve => setTimeout(resolve, 80))
+  check('外部切到原版：tooltip 随之撤掉', tipCount() === 0)
+  check('外部切到原版：宿主原有 title 被还原', tipOf('library') === HOST_TITLE)
+  document.documentElement.removeAttribute('data-iqb-mode')
+  await new Promise(resolve => setTimeout(resolve, 80))
+  check('外部切回图标：tooltip 随之恢复', wide
+    ? (PANELS.every(([label, id]) => tipOf(id) === label) && tipOf('moreTrigger') === '更多')
+    : tipCount() === 0)
+
+  group('宿主重渲染 / 文案变化后的 tooltip')
   toggle.remove()
   await new Promise(resolve => setTimeout(resolve, 80))
   check('观察者把它挂回 nav', document.getElementById('nav').lastElementChild.classList.contains('iqb-toggle'))
+  if (wide) {
+    // A locale switch rewrites the caption text in place: characterData
+    // observation must re-title the icon from the new text. (nodeValue edits
+    // the existing text node; textContent would only fire a childList record.)
+    const caption = document.querySelector('#plugins span + span')
+    caption.firstChild.nodeValue = 'Plugins'
+    await new Promise(resolve => setTimeout(resolve, 80))
+    check('caption 文案变化后 tooltip 跟着更新', tipOf('plugins') === 'Plugins')
+    // A freshly host-registered panel (new row adopted into the nav) must be
+    // named too — the whole point of not hard-coding a panel list.
+    const fresh = document.createElement('button')
+    fresh.id = 'fresh'
+    fresh.setAttribute('aria-label', '新面板')
+    fresh.innerHTML = '<span></span><span>新面板</span>'
+    document.getElementById('nav').appendChild(fresh)
+    await new Promise(resolve => setTimeout(resolve, 80))
+    check('新加入的面板图标也自动带上 tooltip', tipOf('fresh') === '新面板')
+  } else {
+    check('窄轨重渲染后依旧不叠加 tooltip', tipCount() === 0)
+  }
 
   group('卸载清理')
   env.effects.forEach(dispose => { if (typeof dispose === 'function') dispose() })
   check('样式表已移除', document.getElementById('dsh-iconic-quickbar-style') === null)
   check('开关已移除', document.querySelector('.iqb-toggle') === null)
   check('模式属性已清除', !document.documentElement.hasAttribute('data-iqb-mode'))
+  check('卸载后所有 tooltip 标记清空', tipCount() === 0)
+  check('卸载后宿主原有的 title 被还原', tipOf('library') === HOST_TITLE)
 }
 
 // ================================================================ tests
